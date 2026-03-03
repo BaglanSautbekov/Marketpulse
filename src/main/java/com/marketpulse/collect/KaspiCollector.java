@@ -15,18 +15,18 @@ public class KaspiCollector {
         this.http = http;
     }
 
-    public HttpFetchClient.FetchResult collectCategory(String url, Integer page) {
+    public CollectResult collectCategory(String url, Integer page) {
         String u = applyPage(url, page);
-        return http.fetch(u);
+        return new CollectResult(u, http.fetch(u));
     }
 
-    public HttpFetchClient.FetchResult collectSearch(String url, Integer page) {
+    public CollectResult collectSearch(String url, Integer page) {
         String u = applyPage(url, page);
-        return http.fetch(u);
+        return new CollectResult(u, http.fetch(u));
     }
 
-    public HttpFetchClient.FetchResult collectProduct(String url) {
-        return http.fetch(url);
+    public CollectResult collectProduct(String url) {
+        return new CollectResult(url, http.fetch(url));
     }
 
     private static String applyPage(String url, Integer page) {
@@ -47,4 +47,6 @@ public class KaspiCollector {
 
         return base + "?" + q + "&" + pageParam;
     }
+
+    public record CollectResult(String usedUrl, HttpFetchClient.FetchResult response) {}
 }

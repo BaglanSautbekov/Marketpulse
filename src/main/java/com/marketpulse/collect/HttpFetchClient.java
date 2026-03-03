@@ -28,7 +28,7 @@ public class HttpFetchClient {
         try {
             HttpRequest req = HttpRequest.newBuilder()
                     .uri(URI.create(url))
-                    .timeout(Duration.ofSeconds(20))
+                    .timeout(Duration.ofSeconds(25))
                     .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0 Safari/537.36")
                     .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
                     .header("Accept-Language", "ru-RU,ru;q=0.9,en-US;q=0.7,en;q=0.6")
@@ -42,11 +42,11 @@ public class HttpFetchClient {
             String contentEncoding = header(res, "content-encoding").orElse(null);
 
             byte[] body = res.body() == null ? new byte[0] : res.body();
-            if (contentEncoding != null && contentEncoding.toLowerCase().contains("gzip")) {
-                body = gunzip(body);
-            }
+            boolean gz = contentEncoding != null && contentEncoding.toLowerCase().contains("gzip");
+            if (gz) body = gunzip(body);
 
-            return new FetchResult(res.statusCode(), body, contentType, contentEncoding);
+            String storedEncoding = gz ? null : contentEncoding;
+            return new FetchResult(res.statusCode(), body, contentType, storedEncoding);
         } catch (Exception e) {
             throw new RuntimeException(e.getMessage() == null ? e.getClass().getName() : e.getMessage(), e);
         }

@@ -31,24 +31,27 @@ public class KaspiCollectSearchJobHandler implements JobHandler {
 
     @Override
     public void handle(JobQueueDao.ClaimedJob job) {
+        UUID workspaceId = job.workspaceId();
         UUID marketplaceId = job.marketplaceId();
+        if (workspaceId == null) throw JobExecutionException.permanent("workspace_id_required");
         if (marketplaceId == null) throw JobExecutionException.permanent("marketplace_id_required");
 
         JsonNode p = job.payload();
         String url = text(p, "url");
         Integer page = intOrNull(p, "page");
-
         if (url == null || url.isBlank()) throw JobExecutionException.permanent("payload.url_required");
 
-        var res = collector.collectSearch(url, page);
+        var collected = collector.collectSearch(url, page);
+        var res = collected.response();
 
         byte[] body = res.body();
         String checksum = sha256(body);
 
         store.save(
+                workspaceId,
                 marketplaceId,
                 "SEARCH",
-                url,
+                collected.usedUrl(),
                 res.statusCode(),
                 checksum,
                 Instant.now(),
@@ -58,8 +61,15 @@ public class KaspiCollectSearchJobHandler implements JobHandler {
                 res.contentEncoding()
         );
 
-        if (res.statusCode() >= 500) throw JobExecutionException.retryable("upstream_5xx");
-        if (res.statusCode() == 429) throw JobExecutionException.retryable("rate_limited");
+        throwForStatus(res.statusCode());
+    }
+
+    private static void throwForStatus(int status) {
+        if (status == 429) throw JobExecutionException.retryable("rate_limited");
+        if (status >= 500) throw JobExecutionException.retryable("upstream_5xx");
+        if (status == 404) throw JobExecutionException.permanent("not_found");
+        if (status == 403) throw JobExecutionException.retryable("forbidden");
+        if (status >= 400) throw JobExecutionException.permanent("upstream_4xx");
     }
 
     private static String text(JsonNode p, String key) {
