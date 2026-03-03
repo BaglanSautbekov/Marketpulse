@@ -1,0 +1,35 @@
+server:
+  port: 8080
+
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/marketpulse}
+    username: ${DB_USER:marketpulse}
+    password: ${DB_PASSWORD:marketpulse}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+
+app:
+  security:
+    jwt:
+      issuer: ${JWT_ISSUER:marketpulse}
+      secret: 8dd89bb09fb1267ace876594fec7ead3
+      accessTokenMinutes: ${JWT_ACCESS_TOKEN_MINUTES:120}
+  jobs:
+    runner:
+      enabled: ${JOBS_RUNNER_ENABLED:true}
+      batchSize: ${JOBS_RUNNER_BATCH_SIZE:25}
+      fixedDelayMs: ${JOBS_RUNNER_FIXED_DELAY_MS:3000}

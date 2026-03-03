@@ -1,0 +1,90 @@
+package com.marketpulse.jobs.handlers;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.marketpulse.collect.KaspiCollector;
+import com.marketpulse.collect.RawFetchStore;
+import com.marketpulse.jobs.JobExecutionException;
+import com.marketpulse.jobs.JobHandler;
+import com.marketpulse.jobs.JobQueueDao;
+import org.springframework.stereotype.Component;
+
+import java.security.MessageDigest;
+import java.time.Instant;
+import java.util.HexFormat;
+import java.util.UUID;
+
+@Component
+public class KaspiCollectSearchJobHandler implements JobHandler {
+
+    private final KaspiCollector collector;
+    private final RawFetchStore store;
+
+    public KaspiCollectSearchJobHandler(KaspiCollector collector, RawFetchStore store) {
+        this.collector = collector;
+        this.store = store;
+    }
+
+    @Override
+    public boolean supports(String jobType) {
+        return "COLLECT_SEARCH".equals(jobType);
+    }
+
+    @Override
+    public void handle(JobQueueDao.ClaimedJob job) {
+        UUID marketplaceId = job.marketplaceId();
+        if (marketplaceId == null) throw JobExecutionException.permanent("marketplace_id_required");
+
+        JsonNode p = job.payload();
+        String url = text(p, "url");
+        Integer page = intOrNull(p, "page");
+
+        if (url == null || url.isBlank()) throw JobExecutionException.permanent("payload.url_required");
+
+        var res = collector.collectSearch(url, page);
+
+        byte[] body = res.body();
+        String checksum = sha256(body);
+
+        store.save(
+                marketplaceId,
+                "SEARCH",
+                url,
+                res.statusCode(),
+                checksum,
+                Instant.now(),
+                "kaspi:search",
+                body,
+                res.contentType(),
+                res.contentEncoding()
+        );
+
+        if (res.statusCode() >= 500) throw JobExecutionException.retryable("upstream_5xx");
+        if (res.statusCode() == 429) throw JobExecutionException.retryable("rate_limited");
+    }
+
+    private static String text(JsonNode p, String key) {
+        JsonNode n = p.get(key);
+        if (n == null || n.isNull()) return null;
+        return n.asText();
+    }
+
+    private static Integer intOrNull(JsonNode p, String key) {
+        JsonNode n = p.get(key);
+        if (n == null || n.isNull()) return null;
+        if (n.isInt()) return n.asInt();
+        try {
+            return Integer.parseInt(n.asText());
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static String sha256(byte[] bytes) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            return HexFormat.of().formatHex(md.digest(bytes));
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+}
