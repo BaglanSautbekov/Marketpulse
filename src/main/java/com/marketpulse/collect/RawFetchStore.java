@@ -4,6 +4,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -20,14 +21,15 @@ public class RawFetchStore {
     public UUID save(UUID workspaceId, UUID marketplaceId, String kind, String sourceUrl, int httpStatus, String checksum, Instant collectedAt, String parserHint,
                      byte[] payload, String contentType, String contentEncoding) {
 
-        UUID id = jdbcTemplate.queryForObject(
+        UUID id = UUID.randomUUID();
+        Timestamp collectedAtTs = Timestamp.from(collectedAt);
+
+        jdbcTemplate.update(
                 """
                 insert into raw_fetch_meta(id, workspace_id, marketplace_id, kind, source_url, storage_key, http_status, checksum, collected_at, parser_hint)
-                values (gen_random_uuid(), ?, ?, ?, ?, null, ?, ?, ?, ?)
-                returning id
+                values (?, ?, ?, ?, ?, null, ?, ?, ?, ?)
                 """,
-                (rs, rowNum) -> (UUID) rs.getObject("id"),
-                workspaceId, marketplaceId, kind, sourceUrl, httpStatus, checksum, collectedAt, parserHint
+                id, workspaceId, marketplaceId, kind, sourceUrl, httpStatus, checksum, collectedAtTs, parserHint
         );
 
         jdbcTemplate.update(

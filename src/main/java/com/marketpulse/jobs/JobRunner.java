@@ -1,6 +1,7 @@
 package com.marketpulse.jobs;
 
 import com.marketpulse.config.AppProps;
+import com.marketpulse.util.Errors;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -29,16 +30,18 @@ public class JobRunner {
                 dispatcher.dispatch(job);
                 jobQueueDao.markSucceeded(job.id());
             } catch (JobExecutionException e) {
+                String err = Errors.rootMessage(e);
                 if (e.permanent() || job.attempts() >= job.maxAttempts()) {
-                    jobQueueDao.markDead(job.id(), e.getMessage());
+                    jobQueueDao.markDead(job.id(), err);
                 } else {
-                    jobQueueDao.markFailedAndRequeue(job.id(), e.getMessage(), backoffSeconds(job.attempts()));
+                    jobQueueDao.markFailedAndRequeue(job.id(), err, backoffSeconds(job.attempts()));
                 }
             } catch (Exception e) {
+                String err = Errors.rootMessage(e);
                 if (job.attempts() >= job.maxAttempts()) {
-                    jobQueueDao.markDead(job.id(), e.getMessage());
+                    jobQueueDao.markDead(job.id(), err);
                 } else {
-                    jobQueueDao.markFailedAndRequeue(job.id(), e.getMessage(), backoffSeconds(job.attempts()));
+                    jobQueueDao.markFailedAndRequeue(job.id(), err, backoffSeconds(job.attempts()));
                 }
             }
         }

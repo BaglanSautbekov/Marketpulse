@@ -38,9 +38,11 @@ public class KaspiCollectProductJobHandler implements JobHandler {
 
         JsonNode p = job.payload();
         String url = text(p, "url");
+        String cityCode = text(p, "cityCode");
+
         if (url == null || url.isBlank()) throw JobExecutionException.permanent("payload.url_required");
 
-        var collected = collector.collectProduct(url);
+        var collected = collector.collectProduct(url, cityCode);
         var res = collected.response();
 
         byte[] body = res.body();
